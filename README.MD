@@ -1,8 +1,9 @@
-# coding=utf-8
-# Team: CUDA out of memory
-# Team Meambers: Feng-Guang Su, Yiwei Qin, Rouxin Huang, Jeremiah Cheng
-# Class: 11785 Introduction to Deep Learning at CMU
-# Revised From https://github.com/JunweiLiang/MemexQA_StarterCode
+# Introduction
+This is the final project in the class "11785 Introduction to Deep Learning" at CMU. We are the team "CUDA out of memory". 
+
+With the development of photography technology, one may create several personal albums accumulating thousands of photos and many hours of videos to capture important events in their life. While that is a blessing in this new age of technology, it can lead to a problem of disorganization and information overload. Previous work attempts to resolve this problem with an automated way of processing and organizing photos, by proposing a new Visual Question Answering task named MemexQA. MemexQA works by taking the input of the user, the input being a question and a series of pictures, and responds with an answer to that question and a separate series of photos to justify the answer. A natural way to recall the past are by questions and photographs, and MemexQA eloquently combines the two to organize and label photographs, whether it be for the user to recall the past or to organize photographs into separate albums. Our objective for our project is to follow up on the Visual Question Answering task by proposing a new neural network architecture that attains a higher performance on the MemexQA dataset.
+
+Based on the Visual Question Answering task, MemexQA, proposed by ["Focal Visual-Text Attention for Memex Question Answering"](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8603827), we set out to test several alternative models to eventually compile our results to theorize a final model to gain a better overall performance compared to the originally proposed model described by [the paper author](https://github.com/JunweiLiang/MemexQA_StarterCode). Overall we were able to produce a final model that beat the original baseline by roughly 10% in accuracy. 
 
 # Dataset download
 	memexqa_dataset_v1.1/
