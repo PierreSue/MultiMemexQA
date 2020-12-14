@@ -25,11 +25,12 @@ Based on the Visual Question Answering task, MemexQA, proposed by ["Focal Visual
 
 # LSTM_based
 Preprocess: \
-    GloVe: \
-        python3 LSTM_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz memexqa_dataset_v1.1/glove.6B.100d.txt prepro \
-    BERT: \
-        python3 LSTM_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz memexqa_dataset_v1.1/glove.6B.100d.txt prepro_BERT --use_BERT
-
+```
+GloVe: \
+    python3 LSTM_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz memexqa_dataset_v1.1/glove.6B.100d.txt prepro \
+BERT: \
+    python3 LSTM_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz memexqa_dataset_v1.1/glove.6B.100d.txt prepro_BERT --use_BERT
+```
 Train:
 GloVe-WL: \
     python3 LSTM_based/main.py prepro/ glove_WL --modelname simple_lstm --keep_prob 0.7 --is_train
