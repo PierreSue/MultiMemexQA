@@ -55,7 +55,7 @@ def get_args():
 
 
     #training detail
-    parser.add_argument('--batch_size',type=int,default=32)
+    parser.add_argument('--batch_size',type=int,default=8)
     parser.add_argument('--val_num_batches',type=int,default=100,help="eval during training, get how many batch in train/val to eval")
 
     parser.add_argument("--num_epochs",type=int,default=100) # num_step will be num_example/batch_size * epoch
@@ -86,8 +86,8 @@ def get_args():
     parser.add_argument('--hidden_size',type=int,default=100)
     parser.add_argument("--use_attention",default=False,action="store_true",help="use FVTA attention")
     parser.add_argument("--use_transformer",default=False,action="store_true",help="use transformer encoder")
-    parser.add_argument("--warp_type",default=1,type=int,help="time warping type,1:all,2:current, 3:past,4:future,5:past-future")
     parser.add_argument("--image_linear",default=False,action="store_true",help="compress image feature size")
+    parser.add_argument("--attention_mode",default=2,type=int,help="different FVTA implementation, 1: diff simi for diff context, 2:one simi for all context")
     
     # whether to use char emb
     parser.add_argument("--use_char",default=False,action="store_true",help="use character CNN embeding")
@@ -466,6 +466,9 @@ def test(config):
             
     acc = getEvalScore(id2predanswers,id2realanswers)
     print ("done, got %s answers, accuracy:%s"%(len(id2predanswers),acc))
+    #json.dump(id2predanswers,open("%s/answers.json"%config.val_path,"w"))
+    #if config.get_yp:
+    #    json.dump({id_:"%s"%(id2yp[id_]) for id_ in id2yp},open("%s/yps.json"%config.val_path,"w"))
 
 
 def initialize(load,load_best,model,config,sess):

@@ -84,60 +84,14 @@ def linear(x,output_size,scope,add_tanh=True,wd=None,have_bias=True):
 def similarity(v1,v2):
     return tf.concat([v1*v2,(v1-v2)*(v1-v2)],axis=-1)
 
-# time correlation times the indication function,  given [N, T, T]  get a new [N, T, T]
-def time_indication_func(C, warp_type=1, scope=None):
-    with tf.variable_scope(scope or "time_warp"):
-        if warp_type==1: # all Time 
-            return C, None
-        else:
-            T = tf.shape(C)[-1]
-            N = C.get_shape().as_list()[0]
-
-            one = tf.diag(tf.ones([T], dtype=tf.float32)) # [T, T]
-            one = tf.tile(tf.expand_dims(one, 0), [N, 1, 1])
-
-            if warp_type == 2: # current time??
-                #one = tf.eye(T, dtype=tf.float32, batch_shape=N)
-                return one*C, None
-            elif warp_type == 3: # past
-                # need T to be constant
-                #a = np.zeros((T, T), dtype="float")
-                #a[np.tril_indices(T, 0)] = 1.0
-                #past = tf.constant(a)
-                past = tf.matrix_band_part(tf.ones([T, T], dtype=tf.float32), -1, 0) # lower triangular
-                past = tf.tile(tf.expand_dims(past, 0), [N, 1, 1])
-
-                return past*C, None
-            elif warp_type == 4: # future
-                #a = np.zeros((T, T), dtype="float")
-                #a[np.triu_indices(T, 0)] = 1.0
-                #future = tf.constant(a)
-                future = tf.matrix_band_part(tf.ones([T, T], dtype=tf.float32), 0, -1) # upper triangular
-                future = tf.tile(tf.expand_dims(future, 0), [N, 1, 1])
-                return future*C, None
-
-            elif warp_type == 5: # past-future with trainable window
-                window_t_init=3
-                window_t = tf.get_variable('time_warp_window_t', shape=[], dtype=tf.float32, initializer=tf.constant_initializer(window_t_init), trainable=True)
-                window_t_int = tf.cast(tf.ceil(window_t), tf.int64)
-
-                windowed_C = tf.matrix_band_part(tf.ones([T, T], dtype=tf.float32), window_t_int, window_t_int)
-                windowed_C = tf.tile(tf.expand_dims(windowed_C, 0), [N, 1, 1])
-                #windowed_C = tf.Print(windowed_C, [tf.shape(windowed_C)], message="windowed_C debug info", summarize=100)
-                return windowed_C*C, window_t
-            else:
-                raise Exception("time warping type not implemented")
-
-def attention(hinfo, hq, C, scope):
+def attention2(hinfo, hq, C, scope):
     #hinfo: [N,K,T,2d]
     #hq: [N,JQ,2d]  
     #C: [N,T,T] T=M*JMAX
     with tf.variable_scope(scope):
         #hinfo = tf.Print(hinfo, [tf.shape(hinfo)], message="hinfo debug info", summarize=100)
-        N = tf.shape(hinfo)[0]
         K = tf.shape(hinfo)[1]
         T = tf.shape(hinfo)[2]
-        w = tf.shape(hinfo)[3]
         JQ = tf.shape(hq)[1]
 
         hinfo_aug_cross = tf.tile(tf.expand_dims(hinfo,3),[1,1,1,JQ,1]) # [N,K,T,2D] -> [N,K,T,JQ,2D]
@@ -179,6 +133,82 @@ def attention(hinfo, hq, C, scope):
 
 
         return h_hat,q_hat
+
+def attention1(hinfo, hq, scope, dim_last):
+    #hinfo: [N,M,JXA,2d]
+    #hq: [N,JQ,2d]
+    with tf.variable_scope(scope):
+        #window_size = 3
+        #hinfo = tf.Print(hinfo, [tf.shape(hinfo)], message="hinfo debug info", summarize=100)
+        N = tf.shape(hinfo)[0]
+        JQ = tf.shape(hq)[1]
+        lq = hq[:,-1,:]
+        hinfo = tf.reshape(hinfo,[N,-1,dim_last])  #[N,M,JXA,2d] -> [N,M*JXA,2d]
+        T = tf.shape(hinfo)[-2]
+        #hinfo = tf.Print(hinfo, [tf.shape(hinfo)], message="hinfo debug info", summarize=100)
+
+        hat_aug = tf.tile(tf.expand_dims(hinfo,2),[1,1,T,1]) #[N,T,T,2d]
+        #hat_aug = tf.Print(hat_aug, [tf.shape(hat_aug)], message="hat_aug debug info", summarize=100)
+        hat_aug_t = tf.transpose(hat_aug,[0,2,1,3]) #[N,T,T,2d]
+        #hat_aug_t = tf.Print(hat_aug_t, [tf.shape(hat_aug_t)], message="hat_aug_t debug info", summarize=100)
+        simi = similarity(hat_aug,hat_aug_t) #[N,T,T,4d]
+        #simi = tf.Print(simi, [tf.shape(simi)], message="simi debug info", summarize=100)
+
+        #lq_aug = tf.tile(tf.expand_dims(lq,1),[1,T,1]) #[N,2d] -> [N,T,2d]
+        #lq_aug = tf.tile(tf.expand_dims(lq_aug,2),[1,1,T,1]) #[N,T,2d] -> [N,T,T,2d]
+        lq_aug = tf.tile(tf.expand_dims(tf.expand_dims(lq, 1), 1), [1, T, T, 1]) #[N,2d] -> [N,T,T,2d]
+        #lq_aug = tf.Print(lq_aug, [tf.shape(lq_aug)], message="lq_aug debug info", summarize=100)
+        C = linear(simi,dim_last,scope="c_linear1",add_tanh=False,have_bias=False) + lq_aug #[N,T,T,2d]
+        #C = tf.Print(C, [tf.shape(C)], message="C debug info", summarize=100)
+        C = linear(C,1,scope="c_linear2",add_tanh=False,have_bias=False) #[N,T,T,1]
+        #C = tf.Print(C, [tf.shape(C)], message="C debug info", summarize=100)
+        C = tf.squeeze(C,-1) #[N,T,T]
+        #C = tf.Print(C, [tf.shape(C)], message="C debug info", summarize=100)
+        C = tf.tanh(C) #[N,T,T]
+
+        F = tf.matmul(C, hinfo) #[N,T,T] mul [N,T,2d] -> [N,T,2d]
+        #F = tf.Print(F, [tf.shape(F)], message="F debug info", summarize=100) #[N,T,2d]
+
+        F_aug_cross = tf.tile(tf.expand_dims(F,1),[1,JQ,1,1]) #[N,JQ,T,2d]
+        #F_aug_cross = tf.Print(F_aug_cross, [tf.shape(F_aug_cross)], message="F_aug_cross debug info", summarize=100)
+        hq_aug = tf.tile(tf.expand_dims(hq,2),[1,1,T,1]) #[N,JQ,T,2d]
+        #hq_aug = tf.Print(hq_aug, [tf.shape(hq_aug)], message="hq_aug debug info", summarize=100)
+        simi_cross = similarity(F_aug_cross,hq_aug)
+        #simi_cross = tf.Print(simi_cross, [tf.shape(simi_cross)], message="simi_cross debug info", summarize=100)
+
+
+        S = linear(simi_cross,1,scope="s_linear",add_tanh=True,have_bias=True) #[N,JQ,T,1]
+        #S = tf.Print(S, [tf.shape(S)], message="S debug info", summarize=100)
+        S = tf.squeeze(S,-1) #[N,JQ,T]
+        #S = tf.Print(S, [tf.shape(S)], message="S debug info", summarize=100)
+        
+        A = tf.reduce_max(S,axis=1) # [N,JQ,T] -> [N,T]
+        #A = tf.Print(A, [tf.shape(A)], message="A debug info", summarize=100)
+        A = tf.nn.softmax(A,axis=-1) #[N,T]
+        #A = tf.Print(A, [tf.shape(A)], message="A debug info", summarize=100)
+        
+        A_mul_F = tf.matmul(tf.transpose(F,[0,2,1]),tf.expand_dims(A,2)) #[N,T,2d]' mul [N,T,1] -> [N,2d,1]
+        A_mul_F = tf.squeeze(A_mul_F,-1) #[N,2d]
+        #A_mul_F = tf.Print(A_mul_F, [tf.shape(A_mul_F)], message="A_mul_F debug info", summarize=100)
+
+        B = tf.reduce_max(tf.reduce_max(S,axis=1),axis=1) #[N]
+        #B = tf.Print(B, [tf.shape(B)], message="B debug info", summarize=100)
+
+        Q = hq #[N,JQ,2d]
+        #Q = tf.Print(Q, [tf.shape(Q)], message="Q debug info", summarize=100)
+        A_q = tf.reduce_max(S,axis=2) #[N,JQ]
+        #A_q = tf.Print(A_q, [tf.shape(A_q)], message="A_q debug info", summarize=100)
+        A_q = tf.nn.softmax(A_q,axis=-1) #[N,JQ]
+        #A_q = tf.Print(A_q, [tf.shape(A_q)], message="A_q debug info", summarize=100)
+
+        A_mul_Q_q = tf.matmul(tf.transpose(Q, [0,2,1]),tf.expand_dims(A_q,2)) # [N,JQ,2d]' mul [N,JQ,1] -> [[N,2d,1]
+        A_mul_Q_q = tf.squeeze(A_mul_Q_q,-1) #[N,2d]
+        #A_mul_Q_q = tf.Print(A_mul_Q_q, [tf.shape(A_mul_Q_q)], message="A_mul_Q_q debug info", summarize=100)
+
+        B_q = tf.reduce_max(tf.reduce_max(S,axis=2),axis=1) #[N]
+        #B_q = tf.Print(B_q, [tf.shape(B_q)], message="B_q debug info", summarize=100)
+
+        return A_mul_F,B,A_mul_Q_q,B_q
 
 
 # add current scope's variable's l2 loss to loss collection
@@ -351,7 +381,9 @@ class Model():
 
                 # the embedding for each of character 
                 # [N,M,JXA,W]
-                Aat_c = tf.nn.embedding_lookup(char_emb,self.at_c)
+                Aat_c = tf.nn.embedding_lookup(char_emb,self.at_c) #[N,M,JXA,W] -> [N,M,JXA,W,char_embd_size] 
+                #Aat_c = tf.Print(Aat_c, [tf.shape(Aat_c)], message="Aat_c debug info", summarize=100)
+                
                 # [N,M,JD,W]
                 Aad_c = tf.nn.embedding_lookup(char_emb,self.ad_c)
                 # [N,M,JT,W]
@@ -366,7 +398,9 @@ class Model():
                 Achoices_c = tf.nn.embedding_lookup(char_emb,self.choices_c)
 
                 # flatten for conv2d input like images
-                Aat_c = tf.reshape(Aat_c,[-1,JXA,W,cdim])
+                Aat_c = tf.reshape(Aat_c,[-1,JXA,W,cdim]) #[N,M,JXA,W,char_embd_size] -> [N*M, JXA, W, char_embd_size]
+                #Aat_c = tf.Print(Aat_c, [tf.shape(Aat_c)], message="Aat_c_flat debug info", summarize=100)
+                
                 Aad_c = tf.reshape(Aad_c,[-1,JD,W,cdim])
                 Awhen_c = tf.reshape(Awhen_c,[-1,JT,W,cdim])
                 Awhere_c = tf.reshape(Awhere_c,[-1,JG,W,cdim])
@@ -381,7 +415,10 @@ class Model():
                 filter_size = cwdim # output size for each word
                 filter_height = 5
                 with tf.variable_scope("conv"):
-                    xat = conv1d(Aat_c,filter_size,filter_height,config.keep_prob,self.is_train,wd=config.wd,scope="conv1d")
+                    #[N*M, JXA, W, char_embd_size] -> [N*M, JXA, char_emb_size]
+                    xat = conv1d(Aat_c,filter_size,filter_height,config.keep_prob,self.is_train,wd=config.wd,scope="conv1d") 
+                    #xat = tf.Print(xat, [tf.shape(xat)], message="xat_conv debug info", summarize=100)
+                    
                     tf.get_variable_scope().reuse_variables()
                     xad = conv1d(Aad_c,filter_size,filter_height,config.keep_prob,self.is_train,wd=config.wd,scope="conv1d")
                     xwhen = conv1d(Awhen_c,filter_size,filter_height,config.keep_prob,self.is_train,wd=config.wd,scope="conv1d")
@@ -391,7 +428,9 @@ class Model():
                     qchoices = conv1d(Achoices_c,filter_size,filter_height,config.keep_prob,self.is_train,wd=config.wd,scope="conv1d")
 
                     # reshape them back
-                    xat = tf.reshape(xat,[-1,M,JXA,cwdim])
+                    xat = tf.reshape(xat,[-1,M,JXA,cwdim]) #[N*M, JXA, char_emb_size] -> [N,M, JXA, char_emb_size]
+                    #xat = tf.Print(xat, [tf.shape(xat)], message="xat_reshape debug info", summarize=100)
+
                     xad = tf.reshape(xad,[-1,M,JD,cwdim])
                     xwhen = tf.reshape(xwhen,[-1,M,JT,cwdim])
                     xwhere = tf.reshape(xwhere,[-1,M,JG,cwdim])
@@ -427,8 +466,14 @@ class Model():
 
             # concat char and word
             if config.use_char:
-
+                #xat:[N,M, JXA, char_emb_size]
+                #xat = tf.Print(xat, [tf.shape(xat)], message="xat debug info", summarize=100)
+                #Aat:[N,M,JXA,wdim]
+                #Aat = tf.Print(Aat, [tf.shape(Aat)], message="Aat debug info", summarize=100)
+                
+                #xat:[N,M,JXA,cwdim+wdim]
                 xat = tf.concat([xat,Aat],3)
+                #xat = tf.Print(xat, [tf.shape(xat)], message="xat_cat debug info", summarize=100)
                 xad = tf.concat([xad,Aad],3)
                 xwhen = tf.concat([xwhen,Awhen],3)
                 xwhere = tf.concat([xwhere,Awhere],3)
@@ -612,12 +657,7 @@ class Model():
 
                 if config.use_transformer:
                     #transformer encoder
-                    encoder_image = Encoder(num_layers=6, d_model=200, num_heads=8, 
-                            dff=2048, 
-                            maximum_position_encoding=10000)
-                    #linear_image = tf.keras.layers.Dense(2*d)
-
-                    #flat_xpis = linear_image(flat_xpis)    # [N*M,JI,2d]
+                    encoder_image = Encoder(num_layers=6, d_model=200, num_heads=8, dff=2048,)
                     image_result = encoder_image(flat_xpis,training=True,mask=None)
                     
                     hpis = reconstruct(image_result,xpis,2) #[N,M,JI,2d]
@@ -677,72 +717,112 @@ class Model():
 
         with tf.variable_scope("attention"):
             if config.use_attention:
-                K = 6
-                had = tf.pad(had, paddings=[[0, 0], [0, 0], [0, 40 - JD], [0, 0]], mode="CONSTANT", name="had_pad") 
-                #had = tf.Print(had, [tf.shape(had)], message="had debug info", summarize=100)
-                had_reduce = tf.reshape(had,[N,-1,10,4,2*d])  #[N,M,JD,2d]->[N,M,JD/4,4,2d]
-                had_reduce = tf.reduce_mean(had_reduce,3) #[N,M,JD/4,2d] #JD=40,JD/4=10
-                
+                if config.attention_mode == 2:
+                    K = 6
+                    had = tf.pad(had, paddings=[[0, 0], [0, 0], [0, 40 - JD], [0, 0]], mode="CONSTANT", name="had_pad") 
+                    #had = tf.Print(had, [tf.shape(had)], message="had debug info", summarize=100)
+                    had_reduce = tf.reshape(had,[N,-1,10,4,2*d])  #[N,M,JD,2d]->[N,M,JD/4,4,2d]
+                    had_reduce = tf.reduce_mean(had_reduce,3) #[N,M,JD/4,2d] #JD=40,JD/4=10
+                    
 
-                hpts_reduce = tf.reduce_mean(hpts,3) #[N,M,JI,JXP,2d] -> [N,M,JI,2d]  #M=8,JI=10,JXP=10
-                
-                JMAX = tf.reduce_max([JXA, tf.shape(had_reduce)[-2], JT, JG, JI])
+                    hpts_reduce = tf.reduce_mean(hpts,3) #[N,M,JI,JXP,2d] -> [N,M,JI,2d]  #M=8,JI=10,JXP=10
+                    
+                    JMAX = tf.reduce_max([JXA, tf.shape(had_reduce)[-2], JT, JG, JI])
 
-                hat_pad = tf.pad(hat, paddings=[[0, 0], [0, 0], [0, JMAX-JXA], [0, 0]], mode="CONSTANT", name="hat_pad") 
-                
-                #hat_pad = tf.reshape(hat_pad, [N, M, -1, 2*d]) # need to do this to let tf know the shape?
+                    hat_pad = tf.pad(hat, paddings=[[0, 0], [0, 0], [0, JMAX-JXA], [0, 0]], mode="CONSTANT", name="hat_pad") 
+                    
+                    #hat_pad = tf.reshape(hat_pad, [N, M, -1, 2*d]) # need to do this to let tf know the shape?
 
-                had_pad = tf.pad(had_reduce, paddings=[[0, 0], [0, 0], [0, JMAX-tf.shape(had_reduce)[-2]], [0, 0]], mode="CONSTANT", name="had_pad")
+                    had_pad = tf.pad(had_reduce, paddings=[[0, 0], [0, 0], [0, JMAX-tf.shape(had_reduce)[-2]], [0, 0]], mode="CONSTANT", name="had_pad")
 
-                hwhen_pad = tf.pad(hwhen, paddings=[[0, 0], [0, 0], [0, JMAX-JT], [0, 0]], mode="CONSTANT", name="hwhen_pad")
+                    hwhen_pad = tf.pad(hwhen, paddings=[[0, 0], [0, 0], [0, JMAX-JT], [0, 0]], mode="CONSTANT", name="hwhen_pad")
 
-                hwhere_pad = tf.pad(hwhere, paddings=[[0, 0], [0, 0], [0, JMAX-JG], [0, 0]], mode="CONSTANT", name="hwhere_pad")
+                    hwhere_pad = tf.pad(hwhere, paddings=[[0, 0], [0, 0], [0, JMAX-JG], [0, 0]], mode="CONSTANT", name="hwhere_pad")
 
-                hpis_pad = tf.pad(hpis, paddings=[[0, 0], [0, 0], [0, JMAX-JI], [0, 0]], mode="CONSTANT", name="hpis_pad")
+                    hpis_pad = tf.pad(hpis, paddings=[[0, 0], [0, 0], [0, JMAX-JI], [0, 0]], mode="CONSTANT", name="hpis_pad")
 
-                hpts_pad = tf.pad(hpts_reduce, paddings=[[0, 0], [0, 0], [0, JMAX-JI], [0, 0]], mode="CONSTANT", name="hpts_pad")
-
-
-                hall = tf.stack([hat_pad, had_pad, hwhen_pad, hwhere_pad, hpts_pad, hpis_pad], axis=1) # [N, K, M, JMAX, 2d]
-                #hall = tf.Print(hall, [tf.shape(hall)], message="hall debug info", summarize=100)
-                hall = tf.reshape(hall, [N, K, -1, 2*d]) # [N, K, M, JMAX, 2d] -> [N,K,M*JMAX,2d]
-                #hall = tf.Print(hall, [tf.shape(hall)], message="hall debug info", summarize=100)
-
-                T = tf.shape(hall)[-2]
-
-                hall_aug = tf.tile(tf.expand_dims(hall,3),[1,1,1,T,1]) #[N,K,T,T,2d]
-                #hall_aug = tf.Print(hall_aug, [tf.shape(hall_aug)], message="hall_aug debug info", summarize=100)
-                hall_aug_t = tf.tile(tf.expand_dims(hall,2),[1,1,T,1,1]) #[N,K,T,T,2d] 
-                #hall_aug_t = tf.Print(hall_aug_t, [tf.shape(hall_aug_t)], message="hall_aug_t debug info", summarize=100)
-                simi = similarity(hall_aug,hall_aug_t) #[N,K,T,T,4d]
-                #simi = tf.Print(simi, [tf.shape(simi)], message="simi debug info", summarize=100)
-
-                lq_aug = tf.tile(tf.expand_dims(tf.expand_dims(tf.expand_dims(lq, 1), 1),1), [1, K, T, T, 1]) #[N,2d] -> [N,K,T,T,2d]
-                #lq_aug = tf.Print(lq_aug, [tf.shape(lq_aug)], message="lq_aug debug info", summarize=100)
-                C_logits = linear(simi,2*d,scope="c_linear1",add_tanh=False,have_bias=False) + lq_aug #[N,K,T,T,2d]
-                #C_logits = tf.Print(C_logits, [tf.shape(C_logits)], message="C_logits debug info", summarize=100)
-                C_logits = linear(C_logits,1,scope="c_linear2",add_tanh=False,have_bias=False) #[N,K,T,T,1]
-                #C_logits = tf.Print(C_logits, [tf.shape(C_logits)], message="C_logits debug info", summarize=100)
-                C_logits = tf.squeeze(C_logits,-1) #[N,K,T,T]
-                #C_logits = tf.Print(C_logits, [tf.shape(C_logits)], message="C_logits debug info", summarize=100)
-                C_logits = tf.tanh(tf.reduce_sum(C_logits, 1)) #[N,T,T]
+                    hpts_pad = tf.pad(hpts_reduce, paddings=[[0, 0], [0, 0], [0, JMAX-JI], [0, 0]], mode="CONSTANT", name="hpts_pad")
 
 
-                C, win = time_indication_func(C_logits, warp_type=config.warp_type, scope="time_warp_C") # [N, T, T]
+                    hall = tf.stack([hat_pad, had_pad, hwhen_pad, hwhere_pad, hpts_pad, hpis_pad], axis=1) # [N, K, M, JMAX, 2d]
+                    #hall = tf.Print(hall, [tf.shape(hall)], message="hall debug info", summarize=100)
+                    hall = tf.reshape(hall, [N, K, -1, 2*d]) # [N, K, M, JMAX, 2d] -> [N,K,M*JMAX,2d]
+                    #hall = tf.Print(hall, [tf.shape(hall)], message="hall debug info", summarize=100)
+
+                    T = tf.shape(hall)[-2]
+
+                    hall_aug = tf.tile(tf.expand_dims(hall,3),[1,1,1,T,1]) #[N,K,T,T,2d]
+                    #hall_aug = tf.Print(hall_aug, [tf.shape(hall_aug)], message="hall_aug debug info", summarize=100)
+                    hall_aug_t = tf.tile(tf.expand_dims(hall,2),[1,1,T,1,1]) #[N,K,T,T,2d] 
+                    #hall_aug_t = tf.Print(hall_aug_t, [tf.shape(hall_aug_t)], message="hall_aug_t debug info", summarize=100)
+                    simi = similarity(hall_aug,hall_aug_t) #[N,K,T,T,4d]
+                    #simi = tf.Print(simi, [tf.shape(simi)], message="simi debug info", summarize=100)
+
+                    lq_aug = tf.tile(tf.expand_dims(tf.expand_dims(tf.expand_dims(lq, 1), 1),1), [1, K, T, T, 1]) #[N,2d] -> [N,K,T,T,2d]
+                    #lq_aug = tf.Print(lq_aug, [tf.shape(lq_aug)], message="lq_aug debug info", summarize=100)
+                    C_logits = linear(simi,2*d,scope="c_linear1",add_tanh=False,have_bias=False) + lq_aug #[N,K,T,T,2d]
+                    #C_logits = tf.Print(C_logits, [tf.shape(C_logits)], message="C_logits debug info", summarize=100)
+                    C_logits = linear(C_logits,1,scope="c_linear2",add_tanh=False,have_bias=False) #[N,K,T,T,1]
+                    #C_logits = tf.Print(C_logits, [tf.shape(C_logits)], message="C_logits debug info", summarize=100)
+                    C_logits = tf.squeeze(C_logits,-1) #[N,K,T,T]
+                    #C_logits = tf.Print(C_logits, [tf.shape(C_logits)], message="C_logits debug info", summarize=100)
+                    C = tf.tanh(tf.reduce_sum(C_logits, 1)) #[N,T,T]
 
 
-                # get new context
-                hall_aug_for_F = tf.tile(tf.expand_dims(hall, 3), [1, 1, 1, T, 1]) #[N,K,T,2D] -> [N, K, T, T, 2d]
-                #hall_aug_for_F = tf.Print(hall_aug_for_F, [tf.shape(hall_aug_for_F)], message="hall_aug_for_F debug info", summarize=100)
-                C_aug = tf.expand_dims(tf.tile(tf.expand_dims(C, 1), [1, K, 1, 1]), -1)# [N,T,T] -> [N, K, T, T, 1]
-                #C_aug = tf.Print(C_aug, [tf.shape(C_aug)], message="C_aug debug info", summarize=100)
-                F = tf.reduce_sum(hall_aug_for_F*C_aug, -2) #[N, K, T, 2d]
-                #F = tf.Print(F, [tf.shape(F)], message="F debug info", summarize=100)
+                    # get new context
+                    hall_aug_for_F = tf.tile(tf.expand_dims(hall, 3), [1, 1, 1, T, 1]) #[N,K,T,2D] -> [N, K, T, T, 2d]
+                    #hall_aug_for_F = tf.Print(hall_aug_for_F, [tf.shape(hall_aug_for_F)], message="hall_aug_for_F debug info", summarize=100)
+                    C_aug = tf.expand_dims(tf.tile(tf.expand_dims(C, 1), [1, K, 1, 1]), -1)# [N,T,T] -> [N, K, T, T, 1]
+                    #C_aug = tf.Print(C_aug, [tf.shape(C_aug)], message="C_aug debug info", summarize=100)
+                    F = tf.reduce_sum(hall_aug_for_F*C_aug, -2) #[N, K, T, 2d]
+                    #F = tf.Print(F, [tf.shape(F)], message="F debug info", summarize=100)
 
-                #h_hat:[N,2d], q_hat:[N,2d]
-                h_hat,q_hat = attention(hinfo=F, hq=hq, C=C, scope="cross_attention")
+                    #h_hat:[N,2d], q_hat:[N,2d]
+                    h_hat,q_hat = attention2(hinfo=F, hq=hq, C=C, scope="cross_attention")
+
+                if config.attention_mode == 1:
+                    #album_title
+                    A_mul_F_at,B_at,A_mul_Q_at,B_q_at = attention1(hat, hq, scope="album_title", dim_last = 2*d) #JXA=10
+                    #album_description
+                    had = tf.pad(had, paddings=[[0, 0], [0, 0], [0, 40 - JD], [0, 0]], mode="CONSTANT", name="had_pad") 
+                    had_reduce = tf.reshape(had,[N,-1,10,4,2*d])  #[N,M,JD,2d]->[N,M,JD/4,4,2d]
+                    had_reduce = tf.reduce_mean(had_reduce,3) #[N,M,JD/4,2d] #JD=40,JD/4=10
+
+                    A_mul_F_ad,B_ad,A_mul_Q_ad,B_q_ad = attention1(had_reduce, hq, scope="album_description", dim_last = 2*d) #JD=40,JD/4=10
+                    #when
+                    A_mul_F_when,B_when,A_mul_Q_when,B_q_when = attention1(hwhen, hq, scope="when", dim_last = 2*d) #JT=4
+                    #where
+                    A_mul_F_where,B_where,A_mul_Q_where,B_q_where = attention1(hwhere, hq, scope="where", dim_last = 2*d) #JG=4
+                    #photo_title
+                    hpts_reduce = tf.reduce_mean(hpts,3) #[N,M,JI,JXP,2d] -> [N,M,JI,2d]
+                    A_mul_F_pts,B_pts,A_mul_Q_pts,B_q_pts = attention1(hpts_reduce, hq, scope="photo_title", dim_last = 2*d) #M=8,JI=10,JXP=10
+                    #photo
+                    A_mul_F_pis,B_pis,A_mul_Q_pis,B_q_pis = attention1(hpis, hq, scope="photo", dim_last = 2*d) #JI=10
+
+                    
+                    #A_mul_F_at = tf.Print(A_mul_F_at, [tf.shape(A_mul_F_at)], message="A_mul_F_at debug info", summarize=100)
+                    #A_mul_F_ad = tf.Print(A_mul_F_ad, [tf.shape(A_mul_F_ad)], message="A_mul_F_ad debug info", summarize=100)
+                    #A_mul_F_when = tf.Print(A_mul_F_when, [tf.shape(A_mul_F_when)], message="A_mul_F_when debug info", summarize=100)
+                    #A_mul_F_where = tf.Print(A_mul_F_where, [tf.shape(A_mul_F_where)], message="A_mul_F_where debug info", summarize=100)
+                    #A_mul_F_pts = tf.Print(A_mul_F_pts, [tf.shape(A_mul_F_pts)], message="A_mul_F_pts debug info", summarize=100)
+                    #A_mul_F_pis = tf.Print(A_mul_F_pis, [tf.shape(A_mul_F_pis)], message="A_mul_F_pis debug info", summarize=100)
+
+                    A_mul_F = tf.stack([A_mul_F_at,A_mul_F_ad,A_mul_F_when,A_mul_F_where,A_mul_F_pts,A_mul_F_pis],axis=2) #[N,2d,6]
+                    #A_mul_F = tf.Print(A_mul_F, [tf.shape(A_mul_F)], message="A_mul_F debug info", summarize=100)
+                    B = tf.stack([B_at,B_ad,B_when,B_where,B_pts,B_pis],axis=1) #[N,6]
+                    B = tf.nn.softmax(B,axis=-1)
+                    #B = tf.Print(B, [tf.shape(B)], message="B debug info", summarize=100)
+                    h_hat = tf.matmul(A_mul_F,tf.expand_dims(B,2)) #[N,2d,1]
+                    h_hat = tf.squeeze(h_hat,-1) #[N,2d]
+                    
+                    A_mul_Q = tf.stack([A_mul_Q_at,A_mul_Q_ad,A_mul_Q_when,A_mul_Q_where,A_mul_Q_pts,A_mul_Q_pis],axis=2) #[N,2d,6]
+                    #A_mul_Q = tf.Print(A_mul_Q, [tf.shape(A_mul_Q)], message="A_mul_Q debug info", summarize=100)       
+                    B_q = tf.stack([B_q_at,B_q_ad,B_q_when,B_q_where,B_q_pts,B_q_pis],axis=1) #[N,6]
+                    B_q = tf.nn.softmax(B_q,axis=-1)
+                    #B_q = tf.Print(B_q, [tf.shape(B_q)], message="B_q debug info", summarize=100)
+                    q_hat = tf.matmul(A_mul_Q,tf.expand_dims(B_q,2)) #[N,2d,1]
+                    q_hat = tf.squeeze(q_hat,-1) #[N,2d]
                
-
             else:
                 # use last lstm output (last hidden state)
                 # outputs_fw[k,X_len[k]-1] == states_fw.h[k]
