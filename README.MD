@@ -25,51 +25,51 @@ Based on the Visual Question Answering task, MemexQA, proposed by ["Focal Visual
 
 # LSTM_based
 Preprocess:
-GloVe:
+GloVe: \\
     python3 LSTM_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz memexqa_dataset_v1.1/glove.6B.100d.txt prepro
-BERT:
+BERT: \\
     python3 LSTM_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz memexqa_dataset_v1.1/glove.6B.100d.txt prepro_BERT --use_BERT
 
 Train:
-GloVe-WL:
+GloVe-WL: \\
     python3 LSTM_based/main.py prepro/ glove_WL --modelname simple_lstm --keep_prob 0.7 --is_train
-GloVe-WL + FVTA:
+GloVe-WL + FVTA: \\
     python3 LSTM_based/main.py prepro/ glove_WL_FVTA --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 2 --is_train
-GloVe-WL + Char + FVTA:
+GloVe-WL + Char + FVTA: \\
     python3 LSTM_based/main.py prepro/ glove_WL_char_FVTA --modelname simple_lstm --keep_prob 0.7  --use_attention --attention_mode 2 --use_char --is_train
-GloVe-WL + Char + FVTA-S:
+GloVe-WL + Char + FVTA-S: \\
     python3 LSTM_based/main.py prepro/ glove_WL_char_FVTA_S --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 1 --use_char --is_train
-BERT-WL:
+BERT-WL: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL --modelname simple_lstm --keep_prob 0.7 --is_train
-BERT-WL + FVTA:
+BERT-WL + FVTA: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_FVTA --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 2 --is_train
-BERT-WL + Char + FVTA:
+BERT-WL + Char + FVTA: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_char_FVTA --modelname simple_lstm --keep_prob 0.7  --use_attention --attention_mode 2 --use_char --is_train
-BERT-WL + Char + FVTA-S:
+BERT-WL + Char + FVTA-S: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_char_FVTA_S --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 1 --use_char --is_train
 
 Test:
-GloVe-WL:
+GloVe-WL: \\
     python3 LSTM_based/main.py prepro/ glove_WL --modelname simple_lstm --keep_prob 0.7 --is_test
-GloVe-WL + FVTA:
+GloVe-WL + FVTA: \\
     python3 LSTM_based/main.py prepro/ glove_WL_FVTA --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 2 --is_test
-GloVe-WL + Char + FVTA:
+GloVe-WL + Char + FVTA: \\
     python3 LSTM_based/main.py prepro/ glove_WL_char_FVTA --modelname simple_lstm --keep_prob 0.7  --use_attention --attention_mode 2 --use_char --is_test
-GloVe-WL + Char + FVTA-S:
+GloVe-WL + Char + FVTA-S: \\
     python3 LSTM_based/main.py prepro/ glove_WL_char_FVTA_S --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 1 --use_char --is_test
-BERT-WL:
+BERT-WL: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL --modelname simple_lstm --keep_prob 0.7 --is_test
-BERT-WL + FVTA:
+BERT-WL + FVTA: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_FVTA --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 2 --is_test
-BERT-WL + Char + FVTA:
+BERT-WL + Char + FVTA: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_char_FVTA --modelname simple_lstm --keep_prob 0.7  --use_attention --attention_mode 2 --use_char --is_test
-BERT-WL + Char + FVTA-S:
+BERT-WL + Char + FVTA-S: \\
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_char_FVTA_S --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 1 --use_char --is_test --load_best
 
 # Self_Attention_based
-Preprocess:
+Preprocess: \\
     python3 Self_Attention_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_SA --word_based
-Train:
+Train: \\
     python3 Self_Attention_based/train.py --workers 8 --batchSize 32 --niter 100 --inpf ./prepro_BERT_SA/ --outf ./outputs/BERT_WL_SA --cuda --gpu_id 0
-Test:
+Test: \\
     python3 Self_Attention_based/test.py --workers 8 --batchSize 32 --inpf ./prepro_BERT_SA/ --outf ./outputs/BERT_WL_SA --cuda --gpu_id 0
