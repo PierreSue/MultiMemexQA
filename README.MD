@@ -75,7 +75,7 @@ BERT-WL + Char + FVTA-S:
 # Naive Method
 Preprocess:
 ```
-python3 Self_Attention_based/sentence_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_naive --word_based
+python3 Self_Attention_based/sentence_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_naive
 ```
 Train:
 ```
@@ -90,7 +90,7 @@ python3 Self_Attention_based/sentence_based/test.py --workers 8 --batchSize 32 -
 # Self_Attention_based + Sentence_Based
 Preprocess:
 ```
-python3 Self_Attention_based/sentence_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_SA_sb --word_based
+python3 Self_Attention_based/sentence_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_SA_sb
 ```
 Train:
 ```
