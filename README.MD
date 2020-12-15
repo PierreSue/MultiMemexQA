@@ -71,16 +71,46 @@ BERT-WL + Char + FVTA-S:
     python3 LSTM_based/main.py prepro_BERT/ bert_WL_char_FVTA_S --modelname simple_lstm --keep_prob 0.7 --use_attention --attention_mode 1 --use_char --is_test --load_best
 ```
 
-# Self_Attention_based
+
+# Naive Method
 Preprocess:
 ```
-python3 Self_Attention_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_SA --word_based
+python3 Self_Attention_based/sentence_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_naive --word_based
 ```
 Train:
 ```
-python3 Self_Attention_based/train.py --workers 8 --batchSize 32 --niter 100 --inpf ./prepro_BERT_SA/ --outf ./outputs/BERT_WL_SA --cuda --gpu_id 0
+python3 Self_Attention_based/sentence_based/train.py --workers 8 --batchSize 32 --niter 100 --inpf ./prepro_BERT_naive/ --outf ./outputs/BERT_naive --cuda --gpu_id 0 --naive
 ```
 Test:
 ```
-python3 Self_Attention_based/test.py --workers 8 --batchSize 32 --inpf ./prepro_BERT_SA/ --outf ./outputs/BERT_WL_SA --cuda --gpu_id 0
+python3 Self_Attention_based/sentence_based/test.py --workers 8 --batchSize 32 --inpf ./prepro_BERT_naive/ --outf ./outputs/BERT_naive --cuda --gpu_id 0 --naive
+```
+
+
+# Self_Attention_based + Sentence_Based
+Preprocess:
+```
+python3 Self_Attention_based/sentence_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_SA_sb --word_based
+```
+Train:
+```
+python3 Self_Attention_based/sentence_based/train.py --workers 8 --batchSize 32 --niter 100 --inpf ./prepro_BERT_SA_sb/ --outf ./outputs/BERT_WL_SA_sb --cuda --gpu_id 0
+```
+Test:
+```
+python3 Self_Attention_based/sentence_based/test.py --workers 8 --batchSize 32 --inpf ./prepro_BERT_SA_sb/ --outf ./outputs/BERT_WL_SA_sb --cuda --gpu_id 0
+```
+
+# Self_Attention_based + Word_Based
+Preprocess:
+```
+python3 Self_Attention_based/word_based/preprocess.py memexqa_dataset_v1.1/qas.json memexqa_dataset_v1.1/album_info.json memexqa_dataset_v1.1/test_question.ids memexqa_dataset_v1.1/photos_inception_resnet_v2_l2norm.npz prepro_BERT_SA_wb --word_based
+```
+Train:
+```
+python3 Self_Attention_based/word_based/train.py --workers 8 --batchSize 32 --niter 100 --inpf ./prepro_BERT_SA_wb/ --outf ./outputs/BERT_WL_SA_wb --cuda --gpu_id 0
+```
+Test:
+```
+python3 Self_Attention_based/word_based/test.py --workers 8 --batchSize 32 --inpf ./prepro_BERT_SA_wb/ --outf ./outputs/BERT_WL_SA_wb --cuda --gpu_id 0
 ```
