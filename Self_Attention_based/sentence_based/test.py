@@ -14,7 +14,7 @@ import random
 
 from tqdm import tqdm
 
-from model import MemexQA
+from model import MemexQA, NaiveQA
 from dataset import TestDataset
 from torch.utils.data import DataLoader
 
