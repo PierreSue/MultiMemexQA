@@ -103,7 +103,10 @@ test = DataLoader(test_dataset, batch_size=opt.batchSize,
                    shuffle=False, num_workers=opt.workers,
                    collate_fn=collate_fn)
 
-model = MemexQA(input_dim=768, img_dim=2537, hidden_dim=768, key_dim=32, value_dim=32, num_label=2, num_head=8, num_layer=1, mode=opt.mode, device=device)
+if opt.FVTA:
+    model = MemexQA_FVTA(input_dim=768, img_dim=2537, hidden_dim=768, key_dim=32, value_dim=32, num_label=2, num_head=4, num_layer=2, mode=opt.mode, device=device)
+else:
+    model = MemexQA(input_dim=768, img_dim=2537, hidden_dim=768, key_dim=32, value_dim=32, num_label=2, num_head=4, num_layer=2, mode=opt.mode, device=device)
 checkpoint = torch.load('{}/checkpoint_best'.format(opt.outf))
 model.load_state_dict(checkpoint['model_state_dict'])
 model.to(device)
