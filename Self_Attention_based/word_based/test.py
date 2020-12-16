@@ -97,7 +97,7 @@ def collate_fn(batch):
 
 # DataSet and DataLoader
 # test_dataset = TestDataset(opt.inpf)
-test_dataset = EvalDataset(opt.inpf)
+test_dataset = TestDataset(opt.inpf)
 
 test = DataLoader(test_dataset, batch_size=opt.batchSize, 
                    shuffle=False, num_workers=opt.workers,
@@ -126,8 +126,6 @@ with torch.no_grad():
             
         predictions, loss = model(question, question_lengths, answer, answer_lengths, text, text_lengths, images, image_lengths, label)
         predictions = torch.argmax(predictions.view(-1, 4), -1).detach().cpu().numpy()
-
-        print(predictions)
 
         acc += np.sum(predictions == np.zeros_like(predictions))
         acc_count += label.shape[0]//4
